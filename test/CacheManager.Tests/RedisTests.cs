@@ -1428,9 +1428,8 @@ namespace CacheManager.Tests
                             .WithConnectionTimeout(10)
                             .WithAllowAdmin()
                             .WithDatabase(7)
-                            .WithEndpoint("10.120.121.170", 6379)
-                            //.WithPassword("mysupersecret")
-                            //.WithSsl()
+                            .WithPassword("mysupersecret")
+                            .WithSsl()
                             ;
                     });
             });
@@ -1465,9 +1464,8 @@ namespace CacheManager.Tests
                             .WithConnectionTimeout(10)
                             .WithAllowAdmin()
                             .WithDatabase(7)
-                            .WithEndpoint("10.120.121.170", 6379)
-                            //.WithPassword("mysupersecret")
-                            //.WithSsl()
+                            .WithPassword("mysupersecret")
+                            .WithSsl()
                             ;
                     });
             });
@@ -1503,9 +1501,8 @@ namespace CacheManager.Tests
                             .WithConnectionTimeout(10)
                             .WithAllowAdmin()
                             .WithDatabase(7)
-                            .WithEndpoint("10.120.121.170", 6379)
-                            //.WithPassword("mysupersecret")
-                            //.WithSsl()
+                            .WithPassword("mysupersecret")
+                            .WithSsl()
                             ;
                     });
             });
@@ -1540,9 +1537,8 @@ namespace CacheManager.Tests
                             .WithConnectionTimeout(10)
                             .WithAllowAdmin()
                             .WithDatabase(7)
-                            .WithEndpoint("10.120.121.170", 6379)
-                            //.WithPassword("mysupersecret")
-                            //.WithSsl()
+                            .WithPassword("mysupersecret")
+                            .WithSsl()
                             ;
                     });
             });
