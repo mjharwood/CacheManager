@@ -45,6 +45,7 @@ namespace CacheManager.Redis
         /// </param>
         /// <param name="keyspaceNotificationsEnabled">Enables keyspace notifications to react on eviction/expiration of items.</param>
         /// <param name="twemproxyEnabled">Enables Twemproxy mode.</param>
+        /// <param name="keySearchEnabled">Enables support for Keys</param>
         /// <param name="strictCompatibilityModeVersion">
         /// Gets or sets a version number to eventually reduce the avaible features accessible by cachemanager.
         /// </param>
@@ -60,6 +61,7 @@ namespace CacheManager.Redis
             bool allowAdmin = false,
             bool keyspaceNotificationsEnabled = false,
             bool twemproxyEnabled = false,
+            bool keySearchEnabled = false,
             string strictCompatibilityModeVersion = null)
         {
             NotNullOrWhiteSpace(key, nameof(key));
@@ -81,6 +83,7 @@ namespace CacheManager.Redis
             KeyspaceNotificationsEnabled = keyspaceNotificationsEnabled;
             TwemproxyEnabled = twemproxyEnabled;
             StrictCompatibilityModeVersion = strictCompatibilityModeVersion;
+            KeySearchEnabled = keySearchEnabled;
 
             _configurationOptions = CreateConfigurationOptions();
 
@@ -263,6 +266,11 @@ namespace CacheManager.Redis
         /// Gets or sets a value to indicate if Termproxy is being used.
         /// </summary>
         public bool TwemproxyEnabled { get; set; }
+
+        /// <summary>
+        /// Gers or sets a value to indicate if the changes required for Keys are supported, as they may be expensive.
+        /// </summary>
+        public bool KeySearchEnabled { get; set; }
     }
 
     /// <summary>
