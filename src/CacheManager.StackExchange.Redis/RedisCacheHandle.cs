@@ -141,6 +141,10 @@ return result";
 
                 SubscribeKeyspaceNotifications();
             }
+            if (_redisConfiguration.KeySearchEnabled)
+            {
+                ValidateRegionHashes();
+            }
         }
 
         /// <inheritdoc />
@@ -812,7 +816,7 @@ return result";
             if (region == null)
             {
                 var knownRegions = _connection.Database.HashKeys(RegionStore);
-                if (knownRegions.Where(r => key != null && key.StartsWith(r)).Any())
+                if (knownRegions.Where(r => key.StartsWith(r)).Any())
                     throw new InvalidOperationException($"{key} starts with existing region");
             }
             else
@@ -821,6 +825,19 @@ return result";
 
             }
         }
+
+        private void ValidateRegionHashes()
+        {
+            foreach (var region in _connection.Database.HashKeys(RegionStore))
+            {
+                foreach (var key in _connection.Database.HashKeys(region.ToString()))
+                {
+                    if (!_connection.Database.KeyExists(key.ToString()))
+                        _connection.Database.HashDelete(region.ToString(), key, CommandFlags.FireAndForget);
+                }
+            }
+        }
+
 
         private string GetKey(string key, string region = null)
         {
