@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using CacheManager.Core;
@@ -1475,6 +1476,52 @@ namespace CacheManager.Tests
 
             Assert.Equal(new string[] { "key 10" + unique, "key 2" + unique, "key 3" + unique }, keys);
         }
+
+        [Fact]
+        public void Redis_Keys_without_region__keys_with_colons()
+        {
+            var cache = TestManagers.CreateRedisCache(enableKeySearch: true);
+
+            var unique = "--" + DateTime.Now.ToString("o").Replace(":", "."); // so tests do not conflict
+            var key = nameof(Redis_Keys_without_region__keys_with_colons) + ":" + unique;
+
+            cache.Add(key, "dummy");
+
+            var keys = cache.Keys("*" + unique).Where(k => k.EndsWith(unique)).OrderBy(k => k).ToArray();
+
+            Assert.Equal(new string[] { key }, keys); 
+        }
+
+        [Fact]
+        public void Redis_Keys_with_region__region_with_colons()
+        {
+            var cache = TestManagers.CreateRedisCache(enableKeySearch: true);
+
+            var unique = "--" + DateTime.Now.ToString("o").Replace(":", "."); // so tests do not conflict
+            var key = nameof(Redis_Keys_with_region__region_with_colons) + ":" + unique;
+
+            cache.Add(key, "dummy", "test:region");
+
+            var keys = cache.Keys("*" + unique).Where(k => k.EndsWith(unique)).OrderBy(k => k).ToArray();
+
+            Assert.Equal(new string[] { "test:region:" + key }, keys);
+        }
+
+        [Fact]
+        public void Redis_Keys_with_region__key_and_region_with_colons()
+        {
+            var cache = TestManagers.CreateRedisCache(enableKeySearch: true);
+
+            var unique = "--" + DateTime.Now.ToString("o").Replace(":", "."); // so tests do not conflict
+            var key = nameof(Redis_Keys_with_region__key_and_region_with_colons) + ":" + unique;
+
+            cache.Add(key, "dummy", "test:region");
+
+            var keys = cache.Keys("*" + unique).Where(k => k.EndsWith(unique)).OrderBy(k => k).ToArray();
+
+            Assert.Equal(new string[] { "test:region:" + key }, keys);
+        }
+
     }
 
 #if !NETCOREAPP
