@@ -456,7 +456,7 @@ namespace CacheManager.Tests
             return cache;
         }
 
-        public static ICacheManager<object> CreateRedisCache(int database = 0, bool sharedRedisConfig = true, Serializer serializer = Serializer.GzJson, bool useLua = true)
+        public static ICacheManager<object> CreateRedisCache(int database = 0, bool sharedRedisConfig = true, Serializer serializer = Serializer.GzJson, bool useLua = true, bool enableKeySearch = false)
         {
             var redisKey = sharedRedisConfig ? "redisConfig" + database : Guid.NewGuid().ToString();
             var cache = CacheFactory.FromConfiguration<object>(
@@ -475,9 +475,14 @@ namespace CacheManager.Tests
                         {
                             config.UseCompatibilityMode("2.4");
                         }
+                        if (enableKeySearch)
+                        {
+                            config.WithKeySearchEnabled();
+                        }
                     })
                     ////.WithRedisBackplane(redisKey)
                     .WithRedisCacheHandle(redisKey, true)
+                    .WithExpiration(ExpirationMode.Absolute, TimeSpan.FromSeconds(5))
                     .EnableStatistics()
                 .Build());
 
