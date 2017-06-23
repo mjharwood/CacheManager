@@ -18,19 +18,11 @@ namespace CacheManager.Redis
     public class RedisMinimalCacheHandle<TCacheValue> : BaseCacheHandle<TCacheValue>
     {
         private static readonly TimeSpan MinimumExpirationTimeout = TimeSpan.FromMilliseconds(1);
-        private const string Base64Prefix = "base64\0";
         
-        private readonly IDictionary<ScriptType, LoadedLuaScript> _shaScripts = new Dictionary<ScriptType, LoadedLuaScript>();
-        private readonly IDictionary<ScriptType, LuaScript> _luaScripts = new Dictionary<ScriptType, LuaScript>();
         private readonly ICacheManagerConfiguration _managerConfiguration;
-        private readonly RedisValueConverter _valueConverter;
+        private readonly RedisMinimalValueConverter _valueConverter;
         private readonly RedisConnectionManager _connection;
-        private bool _isLuaAllowed;
-        private bool _canPreloadScripts = true;
         private RedisConfiguration _redisConfiguration = null;
-
-        // flag if scripts are initially loaded to the server
-        private bool _scriptsLoaded = false;
 
         private object _lockObject = new object();
         private ICacheSerializer _serializer;
@@ -55,10 +47,7 @@ namespace CacheManager.Redis
             _serializer = serializer;
             _redisConfiguration = RedisConfigurations.GetConfiguration(configuration.Key);
             _connection = new RedisConnectionManager(_redisConfiguration, loggerFactory);
-            _isLuaAllowed = _connection.Features.Scripting;
-
-            // disable preloading right away if twemproxy mode, as this is not supported.
-            _canPreloadScripts = _redisConfiguration.TwemproxyEnabled ? false : true;
+            _valueConverter = new RedisMinimalValueConverter(serializer);
 
             if (_redisConfiguration.KeyspaceNotificationsEnabled)
             {
@@ -342,7 +331,7 @@ namespace CacheManager.Redis
                 var fullKey = GetKey(key, region);
 
                 var valueWithExpire = _connection.Database.StringGetWithExpiry(fullKey);
-                var value = FromRedisValue(valueWithExpire.Value, (string)valueTypeItem);
+                var value = FromRedisValue(valueWithExpire.Value);
 
                 if (valueWithExpire.Expiry == null)
                 {
@@ -475,18 +464,6 @@ namespace CacheManager.Redis
             {
                 region = value.Substring(0, sepIndex);
                 key = value.Substring(sepIndex + 1);
-
-                if (region.StartsWith(Base64Prefix))
-                {
-                    region = region.Substring(Base64Prefix.Length);
-                    region = Encoding.UTF8.GetString(Convert.FromBase64String(region));
-                }
-            }
-
-            if (key.StartsWith(Base64Prefix))
-            {
-                key = key.Substring(Base64Prefix.Length);
-                key = Encoding.UTF8.GetString(Convert.FromBase64String(key));
             }
 
             return Tuple.Create(key, region);
@@ -510,52 +487,28 @@ namespace CacheManager.Redis
                 throw new ArgumentNullException(nameof(key));
             }
 
-            // for notifications, we have to get key and region back from the key stored in redis.
-            // in case the key and or region itself contains the separator, there would be no way to do so...
-            // So, only if that feature is enabled, we'll encode the key and/or region in that case
-            // and the ParseKey method will respect that, too, and decodes the key and/or region.
-            if (_redisConfiguration.KeyspaceNotificationsEnabled && key.Contains(":"))
-            {
-                key = Base64Prefix + Convert.ToBase64String(Encoding.UTF8.GetBytes(key));
-            }
-
             var fullKey = key;
 
             if (!string.IsNullOrWhiteSpace(region))
             {
-                if (_redisConfiguration.KeyspaceNotificationsEnabled && region.Contains(":"))
-                {
-                    region = Base64Prefix + Convert.ToBase64String(Encoding.UTF8.GetBytes(region));
-                }
-
                 fullKey = string.Concat(region, ":", key);
             }
 
             return fullKey;
         }
 
-        private TCacheValue FromRedisValue(RedisValue value, string valueType)
+        private TCacheValue FromRedisValue(RedisValue value)
         {
             if (value.IsNull || value.IsNullOrEmpty || !value.HasValue)
             {
                 return default(TCacheValue);
             }
 
-            if (_valueConverter is IRedisValueConverter<TCacheValue> typedConverter)
-            {
-                return typedConverter.FromRedisValue(value, valueType);
-            }
-
-            return _valueConverter.FromRedisValue<TCacheValue>(value, valueType);
+            return _valueConverter.FromRedisValue<TCacheValue>(value);
         }
 
         private RedisValue ToRedisValue(TCacheValue value)
         {
-            if (_valueConverter is IRedisValueConverter<TCacheValue> typedConverter)
-            {
-                return typedConverter.ToRedisValue(value);
-            }
-
             return _valueConverter.ToRedisValue(value);
         }
 
@@ -574,11 +527,8 @@ namespace CacheManager.Redis
         {
             return Retry(() =>
             {
-                // TODO: how to handle type.
-
                 var fullKey = GetKey(item.Key, item.Region);
                 var value = ToRedisValue(item.Value);
-
 
                 ValidateExpirationTimeout(item);
 

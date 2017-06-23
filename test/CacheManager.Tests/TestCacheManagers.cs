@@ -5,6 +5,8 @@ using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading;
 using CacheManager.Core;
+using Newtonsoft.Json;
+using StackExchange.Redis;
 
 #if MEMCACHEDENABLED
 using Enyim.Caching.Configuration;
@@ -500,6 +502,29 @@ namespace CacheManager.Tests
                     })
                     .WithRedisBackplane(redisKey)
                     .WithRedisCacheHandle(redisKey, true)
+                    .EnableStatistics()
+                .Build());
+
+            return cache;
+        }
+
+        public static ICacheManager<object> CreateRedisMinimalCache(int database = 0, bool sharedRedisConfig = true, Serializer serializer = Serializer.Json)
+        {
+            var redisKey = sharedRedisConfig ? "redisConfig" + database : Guid.NewGuid().ToString();
+            var cache = CacheFactory.FromConfiguration<object>(
+                BaseConfiguration.Builder
+                .WithJsonSerializer(new JsonSerializerSettings { TypeNameHandling = TypeNameHandling.Auto }, new JsonSerializerSettings { TypeNameHandling = TypeNameHandling.Auto })
+                    .WithMaxRetries(int.MaxValue)
+                    .WithRetryTimeout(1000)
+                    .WithRedisConfiguration(redisKey, config =>
+                    {
+                        config
+                            .WithDatabase(database)
+                            .WithEndpoint(RedisHost, RedisPort);
+                    })
+                    .WithRedisBackplane(redisKey)
+                    .WithRedisMinimalCacheHandle(redisKey, true)
+                    .WithExpiration(ExpirationMode.Absolute, TimeSpan.FromMinutes(5))
                     .EnableStatistics()
                 .Build());
 

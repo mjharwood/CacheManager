@@ -157,6 +157,26 @@ namespace CacheManager.Core
             return part.WithHandle(typeof(RedisCacheHandle<>), redisConfigurationKey, isBackplaneSource);
         }
 
+        /// <summary>
+        /// Adds a <see cref="RedisCacheHandle{TCacheValue}"/>.
+        /// This handle requires a redis configuration to be defined with the given <paramref name="redisConfigurationKey"/>.
+        /// </summary>
+        /// <param name="part">The builder instance.</param>
+        /// <param name="redisConfigurationKey">
+        /// The redis configuration key will be used to find a matching redis connection configuration.
+        /// </param>
+        /// <param name="isBackplaneSource">
+        /// Set this to true if this cache handle should be the source of the backplane.
+        /// This setting will be ignored if no backplane is configured.
+        /// </param>
+        /// <returns>The builder instance.</returns>
+        /// <exception cref="ArgumentNullException">Thrown if <paramref name="redisConfigurationKey"/> is null.</exception>
+        public static ConfigurationBuilderCacheHandlePart WithRedisMinimalCacheHandle(this ConfigurationBuilderCachePart part, string redisConfigurationKey, bool isBackplaneSource = true)
+        {
+            NotNull(part, nameof(part));
+
+            return part.WithHandle(typeof(RedisMinimalCacheHandle<>), redisConfigurationKey, isBackplaneSource);
+        }
 #pragma warning restore SA1625
     }
 }

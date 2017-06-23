@@ -1408,6 +1408,51 @@ namespace CacheManager.Tests
             triggerResult.Should().BeTrue("Event should get triggered through the backplane.");
             eventTriggeredLocal.Should().Be(expectedRemoteTriggers, "Local cache event should be triggered one time");
         }
+
+        [Theory]
+        [Trait("category", "Redis")]
+        [InlineData(byte.MaxValue)]
+        [InlineData(new byte[] { 0, 1, 2, 3, 4 })]
+        [InlineData("some string")]
+        [InlineData(int.MaxValue)]
+        [InlineData(uint.MaxValue)]
+        [InlineData(short.MaxValue)]
+        [InlineData(ushort.MaxValue)]
+        [InlineData(float.MaxValue)]
+        [InlineData(double.MaxValue)]
+        [InlineData(true)]
+        [InlineData(false)]
+        [InlineData(long.MaxValue)]
+        [InlineData(ulong.MaxValue)]
+        [InlineData((ulong)int.MaxValue)]
+        [InlineData((ulong)long.MaxValue)]
+        [InlineData(char.MinValue)]
+        [InlineData(char.MaxValue)]
+        public void MinimalRedis_ValueConverter_basictypes<T>(T value)
+        {
+            TypeCache.RegisterResolveType(x => Type.GetType(x));
+
+            var cache = TestManagers.CreateRedisMinimalCache();
+            var key = typeof(T).Name + "-" + Guid.NewGuid().ToString();
+
+            cache.Add(key, value);
+            var val = cache.Get(key);
+            val.ShouldBeEquivalentTo(value);
+            val.GetType().Should().Be(value.GetType());
+        }
+
+        [Fact]
+        public void MinimalRedis_ValueConverter_object()
+        {
+            var cache = TestManagers.CreateRedisMinimalCache();
+            var key = "Poco-" + Guid.NewGuid().ToString();
+
+            var value = new Poco { Id = 66, Something = "a value" };
+            cache.Add(key, value);
+            var val = cache.Get(key);
+            val.ShouldBeEquivalentTo(value);
+            val.GetType().Should().Be(value.GetType());
+        }
     }
 
 #if !NETCOREAPP
@@ -1431,6 +1476,11 @@ namespace CacheManager.Tests
     internal class FakeTestSerializer : ICacheSerializer
     {
         public object Deserialize(byte[] data, Type target)
+        {
+            throw new NotImplementedException();
+        }
+
+        public object Deserialize(byte[] data)
         {
             throw new NotImplementedException();
         }
