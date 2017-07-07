@@ -141,7 +141,7 @@ return result";
 
                 SubscribeKeyspaceNotifications();
             }
-            if (_redisConfiguration.KeySearchEnabled)
+            if (_redisConfiguration.KeySearchEnabled == RedisConfiguration.KeySearch.TrackRegionsUsed)
             {
                 ValidateRegionHashes();
             }
@@ -747,9 +747,13 @@ return result";
                 return Tuple.Create<string, string>(null, null);
             }
 
-            if (handle._redisConfiguration.KeySearchEnabled)
+            if (handle._redisConfiguration.KeySearchEnabled == RedisConfiguration.KeySearch.TrackRegionsUsed)
             {
                 return KeySearchParseKey(value, handle);
+            }
+            else if (handle._redisConfiguration.KeySearchEnabled == RedisConfiguration.KeySearch.AlwaysUseRegionsWithoutColons)
+            {
+                return KeySearchFirstColon(value);
             }
             return StandardParseKey(value);
         }
@@ -766,6 +770,11 @@ return result";
 
             var key = value.Substring(regionMatch.Length + 1);
             return Tuple.Create<string, string>(key, regionMatch);
+        }
+        private static Tuple<string, string> KeySearchFirstColon(string value)
+        {
+            var key = value.Split(new[] { ':' });
+            return Tuple.Create<string, string>(key[1], key[0]);
         }
         private static Tuple<string, string> StandardParseKey(string value)
         {
@@ -807,7 +816,7 @@ return result";
         // TODO: needs a better name
         private void VerifyRegion(string key, string region)
         {
-            if (_redisConfiguration.KeySearchEnabled == false)
+            if (_redisConfiguration.KeySearchEnabled != RedisConfiguration.KeySearch.TrackRegionsUsed)
                 return;
 
             if (key == RegionStore)
@@ -864,7 +873,8 @@ return result";
                 throw new ArgumentNullException(nameof(key));
             }
 
-            if (_redisConfiguration.KeySearchEnabled || _redisConfiguration.KeyspaceNotificationsEnabled == false)
+            if (_redisConfiguration.KeySearchEnabled != RedisConfiguration.KeySearch.Disabled
+                || _redisConfiguration.KeyspaceNotificationsEnabled == false)
             {
                 if (region == null)
                     return key;

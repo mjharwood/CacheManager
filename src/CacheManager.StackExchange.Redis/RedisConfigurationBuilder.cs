@@ -21,7 +21,7 @@ namespace CacheManager.Redis
         private bool _enabledKeyspaceNotifications = false;
         private string _useVersion;
         private bool _useTwemproxy;
-        private bool _keySearchEnabled;
+        private RedisConfiguration.KeySearch _keySearchEnabled;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="RedisConfigurationBuilder"/> class.
@@ -155,9 +155,9 @@ namespace CacheManager.Redis
         /// Enables the features required for Keys, which may be expensive so defaults to disabled.
         /// </summary>
         /// <returns>The builder</returns>
-        public RedisConfigurationBuilder WithKeySearchEnabled()
+        public RedisConfigurationBuilder WithKeySearch(RedisConfiguration.KeySearch keySearchMode)
         {
-            _keySearchEnabled = true;
+            _keySearchEnabled = keySearchMode;
             return this;
         }
 

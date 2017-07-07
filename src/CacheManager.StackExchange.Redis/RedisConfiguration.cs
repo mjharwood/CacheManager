@@ -61,7 +61,7 @@ namespace CacheManager.Redis
             bool allowAdmin = false,
             bool keyspaceNotificationsEnabled = false,
             bool twemproxyEnabled = false,
-            bool keySearchEnabled = false,
+            KeySearch keySearchEnabled = KeySearch.Disabled,
             string strictCompatibilityModeVersion = null)
         {
             NotNullOrWhiteSpace(key, nameof(key));
@@ -267,10 +267,20 @@ namespace CacheManager.Redis
         /// </summary>
         public bool TwemproxyEnabled { get; set; }
 
+        /// <summary>Options for parsing keys</summary>
+        public enum KeySearch
+        {
+            /// <summary>KeySearch features that have a performance impact on general use are disabled</summary>
+            Disabled,
+            /// <summary>If Keyspace Notifications are enabled, keys are assumed to always have a region and the region name does not contain any colons</summary>
+            AlwaysUseRegionsWithoutColons,
+            /// <summary>If Keyspace Notifications are enabled, any region used is tracked in a hash and used to parse events.</summary>
+            TrackRegionsUsed
+        }
         /// <summary>
         /// Gers or sets a value to indicate if the changes required for Keys are supported, as they may be expensive.
         /// </summary>
-        public bool KeySearchEnabled { get; set; }
+        public KeySearch KeySearchEnabled { get; set; }
     }
 
     /// <summary>

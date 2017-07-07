@@ -5,6 +5,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading;
 using CacheManager.Core;
+using CacheManager.Redis;
 
 #if MEMCACHEDENABLED
 using Enyim.Caching.Configuration;
@@ -477,7 +478,7 @@ namespace CacheManager.Tests
                         }
                         if (enableKeySearch)
                         {
-                            config.WithKeySearchEnabled();
+                            config.WithKeySearch(RedisConfiguration.KeySearch.TrackRegionsUsed);
                         }
                     })
                     ////.WithRedisBackplane(redisKey)
