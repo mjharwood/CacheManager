@@ -284,7 +284,7 @@ return result";
                 .Servers
                 .Where(s => s.IsConnected && !s.IsSlave)
                 .SelectMany(s => s.Keys(_redisConfiguration.Database, keyPattern).Select(k => k.ToString()))
-                .Select(k => ParseKey(k).Item1);
+                .Select(k => ParseKey(k, region).Item1);
         }
 
         /// <inheritdoc />
