@@ -830,11 +830,29 @@ return result";
         {
             foreach (var region in _connection.Database.HashKeys(RegionStore))
             {
-                foreach (var key in _connection.Database.HashKeys(region.ToString()))
-                {
-                    if (!_connection.Database.KeyExists(key.ToString()))
-                        _connection.Database.HashDelete(region.ToString(), key, CommandFlags.FireAndForget);
-                }
+                // Remove any entries that no longer exist
+                var hashKeys = _connection.Database.HashKeys(region.ToString()).Select(k => (RedisKey)k.ToString());
+
+                var missing = hashKeys
+                    .Where(key => !_connection.Database.KeyExists(key))
+                    .Select(k => (RedisValue)k.ToString())
+                    .ToArray();
+
+                _connection.Database.HashDelete(region.ToString(), missing, CommandFlags.FireAndForget);
+
+                // Add anything that was added to redis but not the hash
+                // Possible slight race condition where something is added but removed/expired while the following is being process.
+                // Not a major issue as the worst case is thinking an entry is there and trying to delete it.
+                var hashes = _connection
+                    .Servers
+                    .Where(s => s.IsConnected && !s.IsSlave)
+                    .SelectMany(s => s.Keys(_redisConfiguration.Database, region + ":*"))
+                    .Except(hashKeys)
+                    .Select(k => new HashEntry(k.ToString(), "regionKey"))
+                    .ToArray();
+
+                _connection.Database.HashSet(region.ToString(), hashes, CommandFlags.FireAndForget);
+
             }
         }
 
