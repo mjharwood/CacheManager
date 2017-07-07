@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using CacheManager.Core;
@@ -1407,6 +1408,54 @@ namespace CacheManager.Tests
             lastError.Should().BeNull(formatError(lastError));
             triggerResult.Should().BeTrue("Event should get triggered through the backplane.");
             eventTriggeredLocal.Should().Be(expectedRemoteTriggers, "Local cache event should be triggered one time");
+        }
+
+        [Fact]
+        public void Redis_Keys_without_region__keys_with_colons()
+        {
+            var cache = TestManagers.CreateRedisCache(enableKeySearch: true);
+
+            var unique = "--" + DateTime.Now.ToString("o").Replace(":", "."); // so tests do not conflict
+            var key = nameof(Redis_Keys_without_region__keys_with_colons) + ":" + unique;
+
+            cache.Add(key, "dummy");
+            cache.Expire(key, TimeSpan.FromSeconds(5));
+
+            var exists = cache.Exists(key);
+
+            Assert.True(exists); 
+        }
+
+        [Fact]
+        public void Redis_Keys_with_region__region_with_colons()
+        {
+            var cache = TestManagers.CreateRedisCache(enableKeySearch: true);
+
+            var unique = "--" + DateTime.Now.ToString("o").Replace(":", "."); // so tests do not conflict
+            var key = nameof(Redis_Keys_with_region__region_with_colons) + ":" + unique;
+
+            cache.Add(key, "dummy", "test:region");
+            cache.Expire(key, "test:region", TimeSpan.FromSeconds(5));
+
+            var exists = cache.Exists("test:region:" + key);
+
+            Assert.True(exists);
+        }
+
+        [Fact]
+        public void Redis_Keys_with_region__key_and_region_with_colons()
+        {
+            var cache = TestManagers.CreateRedisCache(enableKeySearch: true);
+
+            var unique = "--" + DateTime.Now.ToString("o").Replace(":", "."); // so tests do not conflict
+            var key = nameof(Redis_Keys_with_region__key_and_region_with_colons) + ":" + unique;
+
+            cache.Add(key, "dummy", "test:region");
+            cache.Expire(key, "test:region", TimeSpan.FromSeconds(5));
+
+            var exists = cache.Exists("test:region:" + key);
+
+            Assert.True(exists);
         }
 
         [Theory]

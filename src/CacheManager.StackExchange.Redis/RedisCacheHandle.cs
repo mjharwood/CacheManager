@@ -26,6 +26,7 @@ namespace CacheManager.Redis
         private const string HashFieldValue = "value";
         private const string HashFieldVersion = "version";
         private const string HashFieldUsesDefaultExp = "defaultExpiration";
+        private const string RegionStore = "CacheManager:Regions";
 
         private static readonly string _scriptAdd = $@"
 if redis.call('HSETNX', KEYS[1], '{HashFieldValue}', ARGV[1]) == 1 then
@@ -139,6 +140,10 @@ return result";
                 }
 
                 SubscribeKeyspaceNotifications();
+            }
+            if (_redisConfiguration.KeySearchEnabled)
+            {
+                ValidateRegionHashes();
             }
         }
 
@@ -276,6 +281,8 @@ return result";
         /// <inheritdoc />
         public override UpdateItemResult<TCacheValue> Update(string key, string region, Func<TCacheValue, TCacheValue> updateValue, int maxRetries)
         {
+            VerifyRegion(key, region);
+
             if (!_isLuaAllowed)
             {
                 return UpdateNoScript(key, region, updateValue, maxRetries);
@@ -676,7 +683,7 @@ return result";
                  $"__keyevent@{_redisConfiguration.Database}__:expired",
                  (channel, key) =>
                  {
-                     var tupple = ParseKey(key);
+                     var tupple = ParseKey(key, this);
                      if (Logger.IsEnabled(LogLevel.Debug))
                      {
                          Logger.LogDebug("Got expired event for key '{0}:{1}'", tupple.Item2, tupple.Item1);
@@ -690,7 +697,7 @@ return result";
                 $"__keyevent@{_redisConfiguration.Database}__:evicted",
                 (channel, key) =>
                 {
-                    var tupple = ParseKey(key);
+                    var tupple = ParseKey(key, this);
                     if (Logger.IsEnabled(LogLevel.Debug))
                     {
                         Logger.LogDebug("Got evicted event for key '{0}:{1}'", tupple.Item2, tupple.Item1);
@@ -704,7 +711,7 @@ return result";
                 $"__keyevent@{_redisConfiguration.Database}__:del",
                 (channel, key) =>
                 {
-                    var tupple = ParseKey(key);
+                    var tupple = ParseKey(key, this);
                     if (Logger.IsEnabled(LogLevel.Debug))
                     {
                         Logger.LogDebug("Got del event for key '{0}:{1}'", tupple.Item2, tupple.Item1);
@@ -717,13 +724,51 @@ return result";
 
 #pragma warning restore CSE0003
 
-        private static Tuple<string, string> ParseKey(string value)
+        private static Tuple<string, string> ParseKey(string value, string region)
         {
             if (value == null)
             {
                 return Tuple.Create<string, string>(null, null);
             }
 
+            if (region == null)
+                return Tuple.Create<string, string>(value, null);
+
+            if (value.StartsWith(region))
+                return Tuple.Create<string, string>(value.Substring(region.Length+1), region);
+
+            throw new InvalidCastException($"{value} is not part of {region}");
+        }
+
+        private static Tuple<string, string> ParseKey(string value, RedisCacheHandle<TCacheValue> handle)
+        {
+            if (value == null)
+            {
+                return Tuple.Create<string, string>(null, null);
+            }
+
+            if (handle._redisConfiguration.KeySearchEnabled)
+            {
+                return KeySearchParseKey(value, handle);
+            }
+            return StandardParseKey(value);
+        }
+
+        private static Tuple<string, string> KeySearchParseKey(string value, RedisCacheHandle<TCacheValue> handle)
+        {
+            var knownRegions = handle._connection.Database.HashKeys(RegionStore);
+            var regionMatch = knownRegions.Select(r => r.ToString()).Where(r => value.StartsWith(r)).OrderByDescending(k => k.ToString().Length).FirstOrDefault();
+
+            if (regionMatch == null)
+            {
+                return Tuple.Create<string, string>(value, null);
+            }
+
+            var key = value.Substring(regionMatch.Length + 1);
+            return Tuple.Create<string, string>(key, regionMatch);
+        }
+        private static Tuple<string, string> StandardParseKey(string value)
+        {
             var sepIndex = value.IndexOf(':');
             var hasRegion = sepIndex > 0;
             var key = value;
@@ -750,6 +795,7 @@ return result";
             return Tuple.Create(key, region);
         }
 
+
         private static void ValidateExpirationTimeout(CacheItem<TCacheValue> item)
         {
             if ((item.ExpirationMode == ExpirationMode.Absolute || item.ExpirationMode == ExpirationMode.Sliding) && item.ExpirationTimeout < MinimumExpirationTimeout)
@@ -758,11 +804,71 @@ return result";
             }
         }
 
+        // TODO: needs a better name
+        private void VerifyRegion(string key, string region)
+        {
+            if (_redisConfiguration.KeySearchEnabled == false)
+                return;
+
+            if (key == RegionStore)
+                return;
+
+            if (region == null)
+            {
+                var knownRegions = _connection.Database.HashKeys(RegionStore);
+                if (knownRegions.Where(r => key.StartsWith(r)).Any())
+                    throw new InvalidOperationException($"{key} starts with existing region");
+            }
+            else
+            {
+                _connection.Database.HashSet(RegionStore, region, "region", When.Always, CommandFlags.None);
+
+            }
+        }
+
+        private void ValidateRegionHashes()
+        {
+            foreach (var region in _connection.Database.HashKeys(RegionStore))
+            {
+                // Remove any entries that no longer exist
+                var hashKeys = _connection.Database.HashKeys(region.ToString()).Select(k => (RedisKey)k.ToString());
+
+                var missing = hashKeys
+                    .Where(key => !_connection.Database.KeyExists(key))
+                    .Select(k => (RedisValue)k.ToString())
+                    .ToArray();
+
+                _connection.Database.HashDelete(region.ToString(), missing, CommandFlags.FireAndForget);
+
+                // Add anything that was added to redis but not the hash
+                // Possible slight race condition where something is added but removed/expired while the following is being process.
+                // Not a major issue as the worst case is thinking an entry is there and trying to delete it.
+                var hashes = _connection
+                    .Servers
+                    .Where(s => s.IsConnected && !s.IsSlave)
+                    .SelectMany(s => s.Keys(_redisConfiguration.Database, region + ":*"))
+                    .Except(hashKeys)
+                    .Select(k => new HashEntry(k.ToString(), "regionKey"))
+                    .ToArray();
+
+                _connection.Database.HashSet(region.ToString(), hashes, CommandFlags.FireAndForget);
+
+            }
+        }
+
+
         private string GetKey(string key, string region = null)
         {
             if (string.IsNullOrWhiteSpace(key))
             {
                 throw new ArgumentNullException(nameof(key));
+            }
+
+            if (_redisConfiguration.KeySearchEnabled || _redisConfiguration.KeyspaceNotificationsEnabled == false)
+            {
+                if (region == null)
+                    return key;
+                return string.Concat(region, ":", key);
             }
 
             // for notifications, we have to get key and region back from the key stored in redis.
@@ -827,6 +933,8 @@ return result";
 
         private bool Set(CacheItem<TCacheValue> item, When when, bool sync = false)
         {
+            VerifyRegion(item.Key, item.Region);
+
             if (!_isLuaAllowed)
             {
                 return SetNoScript(item, when, sync);
