@@ -1,5 +1,8 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
+using System.Text.RegularExpressions;
 using CacheManager.Core.Logging;
 using static CacheManager.Core.Utility.Guard;
 
@@ -404,6 +407,33 @@ namespace CacheManager.Core.Internal
             NotNullOrWhiteSpace(region, nameof(region));
 
             return RemoveInternal(key, region);
+        }
+
+        /// <summary>
+        /// Gets all keys that match the given pattern.
+        /// </summary>
+        /// <param name="pattern">A glob to match against keys.</param>
+        /// <param name="region">The cache region.</param>
+        /// <returns>The matching unique keys in the cache</returns>
+        public abstract IEnumerable<string> Keys(string pattern, string region);
+
+        /// <summary>
+        /// Gets all keys that match the given pattern.
+        /// </summary>
+        /// <param name="pattern">A glob to match against keys.</param>
+        /// <returns>The matching unique keys in the cache</returns>
+        public IEnumerable<string> Keys(string pattern)
+        {
+            return Keys(pattern, null);
+        }
+
+        /// <summary>
+        /// Gets all keys
+        /// </summary>
+        /// <returns>The unique keys in the cache</returns>
+        public IEnumerable<string> Keys()
+        {
+            return Keys(null, null);
         }
 
         /// <summary>

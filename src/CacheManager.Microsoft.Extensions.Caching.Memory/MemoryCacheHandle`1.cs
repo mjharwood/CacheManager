@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Text.RegularExpressions;
 using CacheManager.Core;
 using CacheManager.Core.Internal;
 using CacheManager.Core.Logging;
@@ -87,6 +89,26 @@ namespace CacheManager.MicrosoftCachingMemory
             return _cache.Contains(GetItemKey(key, region));
         }
 
+        /// <inheritdoc />
+        public override IEnumerable<string> Keys(string pattern, string region)
+        {
+            var keys = _cache.ListChildren(region ?? GetType().Name)
+                .Select(k => ParseKey(region));
+
+            if (pattern == "*")
+            {
+                return keys;
+            }
+            if (pattern.Contains("*") || pattern.Contains("?"))
+            {
+                var regexPattern = "^" + Regex.Escape(pattern).Replace(@"\*", ".*").Replace(@"\?", ".");
+                var regex = new Regex(regexPattern);
+                return keys.Where(k => regex.IsMatch(k));
+            }
+
+            return keys.Where(k => k.Contains(pattern));
+        }
+
         /// <inheritdoc/>
         protected override CacheItem<TCacheValue> GetCacheItemInternal(string key)
         {
@@ -152,10 +174,7 @@ namespace CacheManager.MicrosoftCachingMemory
             var options = GetOptions(item);
             _cache.Set(key, item, options);
 
-            if (item.Region != null)
-            {
-                _cache.RegisterChild(item.Region, key);
-            }
+            _cache.RegisterChild(item.Region ?? GetType().Name, key);
 
             return true;
         }
@@ -168,10 +187,7 @@ namespace CacheManager.MicrosoftCachingMemory
             var options = GetOptions(item);
             _cache.Set(key, item, options);
 
-            if (item.Region != null)
-            {
-                _cache.RegisterChild(item.Region, key);
-            }
+            _cache.RegisterChild(item.Region ?? GetType().Name, key);
         }
 
         private string GetItemKey(CacheItem<TCacheValue> item) => GetItemKey(item?.Key, item?.Region);
@@ -187,6 +203,18 @@ namespace CacheManager.MicrosoftCachingMemory
 
             return region + ":" + key;
         }
+        private string ParseKey(string key, string region = null)
+        {
+            NotNullOrWhiteSpace(key, nameof(key));
+
+            if (string.IsNullOrWhiteSpace(region))
+            {
+                return key;
+            }
+
+            return key.Substring(region.Length + 1);
+        }
+
 
         private MemoryCacheEntryOptions GetOptions(CacheItem<TCacheValue> item)
         {

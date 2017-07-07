@@ -1409,8 +1409,74 @@ namespace CacheManager.Tests
             triggerResult.Should().BeTrue("Event should get triggered through the backplane.");
             eventTriggeredLocal.Should().Be(expectedRemoteTriggers, "Local cache event should be triggered one time");
         }
+        [Fact]
+        public void Redis_GetAllKeys()
+        {
+            var cache = TestManagers.CreateRedisCache();
+
+            var unique = "--" + DateTime.Now.ToString("o").Replace(":", "."); // so tests do not conflict
+
+            cache.Add("key1" + unique, "value 1");
+            cache.Add("key2" + unique, "value 2");
+
+            var keys = cache.Keys().Where(k => k.EndsWith(unique)).OrderBy(k => k).ToArray();
+
+            Assert.Equal(new string[] { "key1" + unique, "key2" + unique }, keys);
+        }
 
         [Fact]
+        public void Redis_GetRegionKeys()
+        {
+            var cache = TestManagers.CreateRedisCache();
+
+            var unique = "--" + DateTime.Now.ToString("o").Replace(":", "."); // so tests do not conflict
+
+            cache.Add("key1" + unique, "value 1", "region 1");
+            cache.Add("key2" + unique, "value 2", "region 1");
+            cache.Add("key3" + unique, "value 3", "region 2");
+
+            var region1 = cache.Keys("*", "region 1").Where(k => k.EndsWith(unique)).OrderBy(k => k).ToArray();
+            var region2 = cache.Keys("*", "region 2").Where(k => k.EndsWith(unique)).OrderBy(k => k).ToArray();
+
+            Assert.Equal(new string[] { "key1" + unique, "key2" + unique }, region1);
+            Assert.Equal(new string[] { "key3" + unique }, region2);
+        }
+
+
+        [Fact]
+        public void Redis_Keys_without_region_that_match_single_character_pattern()
+        {
+            var cache = TestManagers.CreateRedisCache();
+
+            var unique = "--" + DateTime.Now.ToString("o").Replace(":", "."); // so tests do not conflict
+
+            cache.Add("key1" + unique, "value 1");
+            cache.Add("key 2" + unique, "value 2");
+            cache.Add("key 3" + unique, "value 3");
+            cache.Add("key 10" + unique, "value 3");
+
+            var keys = cache.Keys("key ?" + unique).Where(k => k.EndsWith(unique)).OrderBy(k => k).ToArray();
+
+            Assert.Equal(new string[] { "key 2" + unique, "key 3" + unique }, keys);
+        }
+        [Fact]
+        public void Redis_Keys_without_region_that_match_multiple_character_pattern()
+        {
+            var cache = TestManagers.CreateRedisCache();
+
+            var unique = "--" + DateTime.Now.ToString("o").Replace(":", "."); // so tests do not conflict
+
+            cache.Add("key1" + unique, "value 1");
+            cache.Add("key 2" + unique, "value 2");
+            cache.Add("key 3" + unique, "value 3");
+            cache.Add("key 10" + unique, "value 3");
+
+            var keys = cache.Keys("key *").Where(k => k.EndsWith(unique)).OrderBy(k => k).ToArray();
+
+            Assert.Equal(new string[] { "key 10" + unique, "key 2" + unique, "key 3" + unique }, keys);
+        }
+
+       [Fact]
         public void Redis_Keys_without_region__keys_with_colons()
         {
             var cache = TestManagers.CreateRedisCache(enableKeySearch: true);
@@ -1457,25 +1523,6 @@ namespace CacheManager.Tests
 
             Assert.True(exists);
         }
-
-        [Theory]
-        [Trait("category", "Redis")]
-        [InlineData(byte.MaxValue)]
-        [InlineData(new byte[] { 0, 1, 2, 3, 4 })]
-        [InlineData("some string")]
-        [InlineData(int.MaxValue)]
-        [InlineData(uint.MaxValue)]
-        [InlineData(short.MaxValue)]
-        [InlineData(ushort.MaxValue)]
-        [InlineData(float.MaxValue)]
-        [InlineData(double.MaxValue)]
-        [InlineData(true)]
-        [InlineData(false)]
-        [InlineData(long.MaxValue)]
-        [InlineData(ulong.MaxValue)]
-        [InlineData((ulong)int.MaxValue)]
-        [InlineData((ulong)long.MaxValue)]
-        [InlineData(char.MinValue)]
         [InlineData(char.MaxValue)]
         public void MinimalRedis_ValueConverter_basictypes<T>(T value)
         {

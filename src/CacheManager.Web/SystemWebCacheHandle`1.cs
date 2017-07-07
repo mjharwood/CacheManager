@@ -1,4 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text.RegularExpressions;
 using System.Web;
 using System.Web.Caching;
 using CacheManager.Core;
@@ -84,6 +87,42 @@ namespace CacheManager.Web
             NotNullOrWhiteSpace(region, nameof(region));
 
             return GetCacheItemInternal(key, region) != null;
+        }
+
+        /// <inheritdoc />
+        public override IEnumerable<string> Keys(string pattern, string requestedRegion)
+        {
+            return GetKeys(pattern, requestedRegion).FilterBy(pattern);
+        }
+        IEnumerable<string> GetKeys(string pattern, string requestedRegion)
+        {
+            var item = Context.Cache.GetEnumerator();
+            while (item.MoveNext())
+            {
+                bool isToken;
+                bool hasRegion;
+                string region;
+                string key;
+
+                ParseKeyParts(_instanceKeyLength, item.Key as string, out isToken, out hasRegion, out region, out key);
+
+                if (isToken)
+                    continue;
+                if (hasRegion)
+                {
+                    if (requestedRegion == null)
+                        continue;
+                    if (requestedRegion != region)
+                        continue;
+                }
+                else
+                {
+                    if (requestedRegion != null)
+                        continue;
+                }
+
+                yield return key;
+            }
         }
 
         /// <summary>

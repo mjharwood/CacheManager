@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using CacheManager.Core.Logging;
@@ -82,6 +83,17 @@ namespace CacheManager.Core.Internal
             NotNullOrWhiteSpace(region, nameof(region));
             var fullKey = GetKey(key, region);
             return _cache.ContainsKey(fullKey);
+        }
+
+        /// <inheritdoc />
+        public override IEnumerable<string> Keys(string pattern, string region)
+        {
+            if (region == null)
+                return _cache.Keys;
+
+            var skip = region.Length + 1;
+
+            return _cache.Keys.Where(k => k.StartsWith(region)).Select(k => k.Substring(skip)).FilterBy(pattern);
         }
 
         /// <summary>
