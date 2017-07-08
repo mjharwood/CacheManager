@@ -873,6 +873,14 @@ return result";
                 throw new ArgumentNullException(nameof(key));
             }
 
+            if (_redisConfiguration.KeySearchEnabled == RedisConfiguration.KeySearch.AlwaysUseRegionsWithoutColons)
+            {
+                if (region == null)
+                    throw new InvalidOperationException("Region not set but AlwaysUseRegionsWithoutColons is");
+                if (region.Contains(":"))
+                    throw new InvalidOperationException("Region contains : but AlwaysUseRegionsWithoutColons is");
+            }
+
             if (_redisConfiguration.KeySearchEnabled != RedisConfiguration.KeySearch.Disabled
                 || _redisConfiguration.KeyspaceNotificationsEnabled == false)
             {
